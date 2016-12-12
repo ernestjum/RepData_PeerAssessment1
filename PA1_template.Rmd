@@ -1,0 +1,122 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+author: Ernest Jum
+output:
+html_document:
+keep_md: true
+---
+
+
+## Loading and preprocessing the data
+```{r, echo=FALSE, results='hold', message=FALSE, warning=FALSE}
+setwd("/Users/ernestjum/Documents/ReproducibleResearch/RepData_PeerAssessment1")
+```
+
+```{r}
+mydata<-read.csv("activity.csv", header=TRUE)
+```
+
+
+## What is mean total number of steps taken per day?
+
+```{r, echo=FALSE, results='hold', message=FALSE, warning=FALSE}
+library(ggplot2)
+```
+
+1. Total number of steps taken per day:
+```{r}
+# (data.frame(total.steps <- tapply(mydata$steps, mydata$date, FUN = sum, na.rm = TRUE)))
+total.steps <- tapply(mydata$steps, mydata$date, FUN = sum, na.rm = TRUE)
+```
+
+2. Histogram of of the total number of steps taken each day
+```{r}
+qplot(total.steps, binwidth = 1000, main = "Histogram of Total Number of Steps Taken each Day", xlab = "total number of steps taken each day")
+```
+
+3. Mean and median of the total number of steps taken per day
+```{r}
+(mean(total.steps, na.rm = TRUE))
+(median(total.steps, na.rm = TRUE))
+```
+
+## What is the average daily activity pattern?
+
+1.Time series plot (i.e. 𝚝𝚢𝚙𝚎 = "𝚕") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis)
+
+```{r}
+averages <- aggregate(x = list(steps = mydata$steps), by = list(interval = mydata$interval), 
+    FUN = mean, na.rm = TRUE)
+ggplot(data = averages, aes(x = interval, y = steps)) + geom_line() + xlab("5-minute interval") + 
+    ylab("average number of steps taken")
+```
+
+ 2. Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?   
+On average across all the days in the dataset, the 5-minute interval contains the maximum number of steps is given by 
+
+```{r}
+averages[which.max(averages$steps), ]
+```
+
+## Imputing missing values
+There are many days/intervals where there are missing values (coded as NA). The presence of missing days may introduce bias into some calculations or summaries of the data. All of the missing values are filled in with mean value for that 5-minute interval.
+
+1.Reporting the total number of missing values in the dataset (i.e. the total number of rows with 𝙽𝙰s)
+```{r}
+sapply(mydata, function(x) sum(is.na(x)))
+```
+2. Filling in all of the missing values in the dataset
+```{r}
+# Replace each missing value with the mean value of its 5-minute interval: Note to me: change this and use a different method..
+fill.value <- function(steps, interval) {
+    filled <- NA
+    if (!is.na(steps)) 
+        filled <- c(steps) else filled <- (averages[averages$interval == interval, "steps"])
+    return(filled)
+}
+```
+
+3. New dataset that is equal to the original dataset but with the missing data filled in.
+```{r}
+new.data <- mydata
+new.data$steps <- mapply(fill.value, new.data$steps, new.data$interval)
+```
+
+4. Now, using the new data set, we make a histogram of the total number of steps taken each day and calculate the mean and median total number of steps.
+
+```{r}
+total.steps <- tapply(new.data$steps, new.data$date, FUN = sum)
+qplot(total.steps, binwidth = 1000, xlab = "total number of steps taken each day")
+```
+
+
+```{r}
+mean(total.steps)
+
+median(total.steps)
+```
+Mean and median values are higher after imputing missing data. The reason is that in the original data, there are some days with steps values NA for any interval. The total number of steps taken in such days are set to 0s by default. However, after replacing missing steps values with the mean steps of associated interval value, these 0 values are removed from the histogram of total number of steps taken each day.
+
+
+## Are there differences in activity patterns between weekdays and weekends?
+Here, we find the day of the week for each measurement in the dataset. In this part, we use the dataset with the filled-in values (new.data).
+
+```{r}
+weekday.type <- function(date) {
+    day <- weekdays(date)
+    if (day %in% c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday")) 
+        return("weekday") else if (day %in% c("Saturday", "Sunday")) 
+        return("weekend") else stop("not a valid date")
+}
+new.data$date <- as.Date(new.data$date)
+new.data$day <- sapply(new.data$date, FUN = weekday.type)
+```
+Now, we create a panel plot indicating the of average number of steps taken on weekdays and weekends. The time plot seems to suggest that there is a difference in the activity pattern during weekdays and weekends.
+
+```{r}
+averages <- aggregate(steps ~ interval + day, data = new.data, mean)
+ggplot(averages, aes(interval, steps)) + geom_line() + facet_grid(day ~ .) + 
+    xlab("Interval") + ylab("Number of steps")
+```
+
+
